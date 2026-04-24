@@ -1,12 +1,20 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import ReportEditForm from "@/components/forms/ReportEditForm";
 import type { Metadata } from "next";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+interface ReportEditData {
+  id: string;
+  description: string;
+  work_start: string;
+  work_end: string;
+  status: string;
+  user_id: string;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -17,28 +25,35 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
+async function getReport(id: string, cookieHeader: string): Promise<ReportEditData | null> {
+  const url = new URL(`/api/reports/${id}`, process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const res = await fetch(url.toString(), {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.data ?? null;
+}
+
 export default async function EditReportPage({ params }: PageProps) {
   const session = await auth();
   if (!session) redirect("/login");
 
   const { id } = await params;
 
-  const report = await prisma.report.findFirst({
-    where: {
-      id,
-      user_id: session.user.id, // ownership enforced at DB query level
-      deleted_at: null,
-    },
-    select: {
-      id: true,
-      description: true,
-      work_start: true,
-      work_end: true,
-      status: true,
-    },
-  });
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  const report = await getReport(id, cookieHeader);
 
   if (!report) notFound();
+
+  // Ownership enforced — only the report owner can edit
+  if (report.user_id !== session.user.id) {
+    redirect("/dashboard");
+  }
 
   // Only pending reports are editable
   if (report.status !== "pending") {
@@ -95,8 +110,8 @@ export default async function EditReportPage({ params }: PageProps) {
           reportId={id}
           defaultValues={{
             description: report.description,
-            work_start: report.work_start.toISOString(),
-            work_end: report.work_end.toISOString(),
+            work_start: report.work_start,
+            work_end: report.work_end,
           }}
         />
       </div>

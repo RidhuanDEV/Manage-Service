@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { StatusBadge } from "@/components/ui/Badge";
 import Link from "next/link";
@@ -12,6 +11,26 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+interface ReportDetail {
+  id: string;
+  user_id: string;
+  description: string;
+  work_start: string;
+  work_end: string;
+  status: string;
+  reject_reason: string | null;
+  before_image_key: string;
+  after_image_key: string;
+  created_at: string;
+  updated_at: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: { name: string; label: string };
+  };
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   return {
@@ -20,29 +39,32 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
+async function getReport(id: string, cookieHeader: string): Promise<ReportDetail | null> {
+  const url = new URL(`/api/reports/${id}`, process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const res = await fetch(url.toString(), {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.data ?? null;
+}
+
 export default async function ReportDetailPage({ params }: PageProps) {
   const session = await auth();
   if (!session) redirect("/login");
 
   const { id } = await params;
 
-  const report = await prisma.report.findFirst({
-    where: { id, deleted_at: null },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: { select: { name: true, label: true } },
-        },
-      },
-    },
-  });
+  // We use the cookies() header to pass auth to our own API
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  const report = await getReport(id, cookieHeader);
 
   if (!report) notFound();
 
-  // Ownership check: user hanya bisa lihat laporan milik sendiri, admin bisa semua
   const isAdmin = hasPermission(session.user.permissions, PERMISSIONS.MANAGE_USERS);
   if (!isAdmin && report.user_id !== session.user.id) {
     redirect("/dashboard");
@@ -51,8 +73,8 @@ export default async function ReportDetailPage({ params }: PageProps) {
   const isOwner = report.user_id === session.user.id;
   const canEdit = isOwner && report.status === "pending";
 
-  function formatDateTime(d: Date) {
-    return d.toLocaleString("id-ID", {
+  function formatDateTime(d: string) {
+    return new Date(d).toLocaleString("id-ID", {
       weekday: "long",
       day: "2-digit",
       month: "long",
@@ -62,8 +84,8 @@ export default async function ReportDetailPage({ params }: PageProps) {
     });
   }
 
-  function getDuration(start: Date, end: Date) {
-    const diff = Math.floor((end.getTime() - start.getTime()) / 60000);
+  function getDuration(start: string, end: string) {
+    const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 60000);
     const h = Math.floor(diff / 60);
     const m = diff % 60;
     return h > 0 ? `${h} jam ${m} menit` : `${m} menit`;
@@ -217,15 +239,15 @@ export default async function ReportDetailPage({ params }: PageProps) {
           <div style={{ borderTop: "var(--border)", paddingTop: "0.875rem" }}>
             <p style={{ fontSize: "0.8125rem", color: "var(--color-muted)", fontWeight: 600 }}>
               Dibuat:{" "}
-              {report.created_at.toLocaleString("id-ID", {
+              {new Date(report.created_at).toLocaleString("id-ID", {
                 dateStyle: "medium",
                 timeStyle: "short",
               })}
             </p>
-            {report.updated_at.getTime() !== report.created_at.getTime() && (
+            {report.updated_at !== report.created_at && (
               <p style={{ fontSize: "0.8125rem", color: "var(--color-muted)", fontWeight: 600, marginTop: "0.125rem" }}>
                 Diperbarui:{" "}
-                {report.updated_at.toLocaleString("id-ID", {
+                {new Date(report.updated_at).toLocaleString("id-ID", {
                   dateStyle: "medium",
                   timeStyle: "short",
                 })}
@@ -240,17 +262,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
           <div className="card">
             <span
               className="label"
-              style={{
-                display: "block",
-                marginBottom: "0.75rem",
-              }}
+              style={{ display: "block", marginBottom: "0.75rem" }}
             >
               📷 Foto Sebelum Kerja
             </span>
-            {/*
-              unoptimized: src is a same-origin /api/files/... streaming route.
-              Next.js Image Optimization cannot resize dynamic API responses.
-            */}
             <Image
               src={`/api/files/${encodeURIComponent(report.before_image_key)}`}
               alt="Foto sebelum kerja"
@@ -274,17 +289,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
           <div className="card">
             <span
               className="label"
-              style={{
-                display: "block",
-                marginBottom: "0.75rem",
-              }}
+              style={{ display: "block", marginBottom: "0.75rem" }}
             >
               📸 Foto Sesudah Kerja
             </span>
-            {/*
-              unoptimized: src is a same-origin /api/files/... streaming route.
-              Next.js Image Optimization cannot resize dynamic API responses.
-            */}
             <Image
               src={`/api/files/${encodeURIComponent(report.after_image_key)}`}
               alt="Foto sesudah kerja"

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
 import { RegisterForm } from "@/components/forms/RegisterForm";
 
 export const metadata: Metadata = {
@@ -7,16 +6,22 @@ export const metadata: Metadata = {
   description: "Buat akun baru untuk mengakses sistem laporan kerja karyawan.",
 };
 
-// Fetch active non-ADMIN roles for the dropdown
-async function getAvailableRoles() {
-  return prisma.role.findMany({
-    where: {
-      is_active: true,
-      name: { not: "ADMIN" }, // Prevent public self-assignment of admin
-    },
-    select: { id: true, name: true, label: true },
-    orderBy: { label: "asc" },
+interface RoleOption {
+  id: string;
+  name: string;
+  label: string;
+}
+
+// Fetch active non-ADMIN roles for the dropdown via API
+async function getAvailableRoles(): Promise<RoleOption[]> {
+  const url = new URL("/api/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const res = await fetch(url.toString(), {
+    cache: "no-store", // Or revalidate if you prefer
   });
+  
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data ?? [];
 }
 
 export default async function RegisterPage() {

@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { CreateRoleModal, EditRoleModal, DeleteRoleButton } from "@/components/admin/RoleControls";
 import type { Metadata } from "next";
@@ -10,6 +9,32 @@ export const metadata: Metadata = {
   description: "Kelola role dan permission karyawan",
 };
 
+interface Permission {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+interface Role {
+  id: string;
+  name: string;
+  label: string;
+  is_active: boolean;
+  permissions: { permission: Permission }[];
+  _count: { users: number };
+}
+
+async function getRolesAndPermissions(cookieHeader: string): Promise<{ roles: Role[]; permissions: Permission[] }> {
+  const url = new URL("/api/admin/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const res = await fetch(url.toString(), {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+  if (!res.ok) return { roles: [], permissions: [] };
+  const json = await res.json();
+  return { roles: json.data?.roles ?? [], permissions: json.data?.permissions ?? [] };
+}
+
 export default async function AdminRolesPage() {
   const session = await auth();
   if (!session) redirect("/login");
@@ -17,23 +42,11 @@ export default async function AdminRolesPage() {
     redirect("/dashboard");
   }
 
-  const [roles, permissions] = await Promise.all([
-    prisma.role.findMany({
-      orderBy: { created_at: "asc" },
-      include: {
-        permissions: {
-          include: {
-            permission: { select: { id: true, name: true, description: true } },
-          },
-        },
-        _count: { select: { users: true } },
-      },
-    }),
-    prisma.permission.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, description: true },
-    }),
-  ]);
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  const { roles, permissions } = await getRolesAndPermissions(cookieHeader);
 
   return (
     <div>
@@ -78,21 +91,11 @@ export default async function AdminRolesPage() {
         >
           🔑 Daftar Permission
         </p>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-          }}
-        >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
           {permissions.map((p) => (
             <div
               key={p.id}
-              style={{
-                background: "#fff",
-                border: "2px solid #000",
-                padding: "0.25rem 0.625rem",
-              }}
+              style={{ background: "#fff", border: "2px solid #000", padding: "0.25rem 0.625rem" }}
             >
               <span style={{ fontSize: "0.8rem", fontWeight: 700 }}>{p.name}</span>
               {p.description && (
@@ -174,13 +177,7 @@ export default async function AdminRolesPage() {
                       </span>
                     )}
                   </div>
-                  <p
-                    style={{
-                      fontSize: "0.875rem",
-                      color: "var(--color-muted)",
-                      marginTop: "0.25rem",
-                    }}
-                  >
+                  <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", marginTop: "0.25rem" }}>
                     {role._count.users} user menggunakan role ini
                   </p>
                 </div>

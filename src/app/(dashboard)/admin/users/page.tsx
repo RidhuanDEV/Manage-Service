@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { paginationSchema } from "@/lib/validations";
 import { Pagination } from "@/components/ui/Pagination";
@@ -12,8 +11,65 @@ export const metadata: Metadata = {
   description: "Kelola akun dan role karyawan",
 };
 
+interface RoleOption {
+  id: string;
+  name: string;
+  label: string;
+}
+
+interface UserItem {
+  id: string;
+  name: string;
+  email: string;
+  deleted_at: string | null;
+  created_at: string;
+  role: { id: string; name: string; label: string };
+  _count: { reports: number };
+}
+
+interface PaginationMeta {
+  halaman: number;
+  batas: number;
+  total: number;
+  total_halaman: number;
+}
+
 interface PageProps {
   searchParams: Promise<{ page?: string; limit?: string; search?: string }>;
+}
+
+async function getUsers(
+  page: number,
+  limit: number,
+  search: string,
+  cookieHeader: string
+): Promise<{ users: UserItem[]; meta: PaginationMeta }> {
+  const url = new URL("/api/admin/users", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("limit", String(limit));
+  if (search) url.searchParams.set("search", search);
+
+  const res = await fetch(url.toString(), {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+
+  if (!res.ok) return { users: [], meta: { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
+
+  const json = await res.json();
+  return { users: json.data ?? [], meta: json.meta ?? { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
+}
+
+async function getRoles(cookieHeader: string): Promise<RoleOption[]> {
+  // Reuse the admin roles endpoint but only need basic list — use public roles API
+  const url = new URL("/api/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const res = await fetch(url.toString(), {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data ?? [];
 }
 
 export default async function AdminUsersPage({ searchParams }: PageProps) {
@@ -27,40 +83,17 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
   const { page, limit } = paginationSchema.parse(raw);
   const search = raw.search ?? "";
 
-  const where = {
-    ...(search && {
-      OR: [
-        { name: { contains: search } },
-        { email: { contains: search } },
-      ],
-    }),
-  };
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
 
-  const [users, total, roles] = await Promise.all([
-    prisma.user.findMany({
-      where,
-      orderBy: { created_at: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        deleted_at: true,
-        created_at: true,
-        role: { select: { id: true, name: true, label: true } },
-        _count: { select: { reports: true } },
-      },
-    }),
-    prisma.user.count({ where }),
-    prisma.role.findMany({
-      where: { is_active: true },
-      select: { id: true, name: true, label: true },
-      orderBy: { name: "asc" },
-    }),
+  const [{ users, meta }, roles] = await Promise.all([
+    getUsers(page, limit, search, cookieHeader),
+    getRoles(cookieHeader),
   ]);
 
-  const totalPages = Math.ceil(total / limit);
+  const total = meta.total;
+  const totalPages = meta.total_halaman;
 
   return (
     <div>
@@ -153,7 +186,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                         <br />
                         <span style={{ fontSize: "0.8125rem", color: "var(--color-muted)" }}>
                           Bergabung{" "}
-                          {user.created_at.toLocaleDateString("id-ID", {
+                          {new Date(user.created_at).toLocaleDateString("id-ID", {
                             day: "2-digit",
                             month: "short",
                             year: "numeric",
@@ -161,18 +194,12 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                         </span>
                       </td>
                       <td>
-                        <span
-                          style={{
-                            fontSize: "0.9rem",
-                            wordBreak: "break-all",
-                          }}
-                        >
+                        <span style={{ fontSize: "0.9rem", wordBreak: "break-all" }}>
                           {user.email}
                         </span>
                       </td>
                       <td>
                         {isSelf ? (
-                          // Can't change own role
                           <span
                             style={{
                               background: "var(--color-primary)",

@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Pagination } from "@/components/ui/Pagination";
@@ -12,8 +11,50 @@ export const metadata: Metadata = {
   description: "Lihat semua laporan kerja Anda",
 };
 
+interface ReportItem {
+  id: string;
+  description: string;
+  work_start: string;
+  work_end: string;
+  status: string;
+  created_at: string;
+  reject_reason: string | null;
+}
+
+interface PaginationMeta {
+  halaman: number;
+  batas: number;
+  total: number;
+  total_halaman: number;
+}
+
 interface PageProps {
   searchParams: Promise<{ page?: string; limit?: string }>;
+}
+
+async function getReports(
+  userId: string,
+  page: number,
+  limit: number
+): Promise<{ reports: ReportItem[]; meta: PaginationMeta }> {
+  // Server component calling its own API — use absolute URL via process.env
+  const url = new URL("/api/reports", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      // Forward cookie for auth — needed for server-side fetch to own API
+      Cookie: `next-auth.session-token=${userId}`,
+    },
+    // No caching — always fresh data
+    cache: "no-store",
+  });
+
+  if (!res.ok) return { reports: [], meta: { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
+
+  const json = await res.json();
+  return { reports: json.data ?? [], meta: json.meta ?? { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
@@ -23,46 +64,25 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const { page, limit } = paginationSchema.parse(params);
 
-  const where = {
-    user_id: session.user.id,
-    deleted_at: null,
-  } as const;
+  const { reports, meta } = await getReports(session.user.id, page, limit);
 
-  const [reports, total] = await Promise.all([
-    prisma.report.findMany({
-      where,
-      orderBy: { created_at: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      select: {
-        id: true,
-        description: true,
-        work_start: true,
-        work_end: true,
-        status: true,
-        created_at: true,
-        reject_reason: true,
-      },
-    }),
-    prisma.report.count({ where }),
-  ]);
+  const total = meta.total;
+  const totalPages = meta.total_halaman;
 
-  const totalPages = Math.ceil(total / limit);
-
-  function formatDate(d: Date) {
-    return d.toLocaleDateString("id-ID", {
+  function formatDate(d: string) {
+    return new Date(d).toLocaleDateString("id-ID", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
   }
 
-  function formatTime(d: Date) {
-    return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  function formatTime(d: string) {
+    return new Date(d).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   }
 
-  function getDuration(start: Date, end: Date) {
-    const diff = Math.floor((end.getTime() - start.getTime()) / 60000);
+  function getDuration(start: string, end: string) {
+    const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 60000);
     const h = Math.floor(diff / 60);
     const m = diff % 60;
     return h > 0 ? `${h}j ${m}m` : `${m}m`;

@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { reportFilterSchema } from "@/lib/validations";
 import { Pagination } from "@/components/ui/Pagination";
@@ -8,7 +7,6 @@ import { AdminReportFilter } from "@/components/admin/AdminReportFilter";
 import { UpdateReportStatusModal } from "@/components/admin/UpdateReportStatusModal";
 import Link from "next/link";
 import type { Metadata } from "next";
-import type { Prisma } from "@prisma/client";
 
 export const metadata: Metadata = {
   title: "Admin Laporan — Manage Service",
@@ -17,6 +15,59 @@ export const metadata: Metadata = {
 
 interface PageProps {
   searchParams: Promise<Record<string, string | undefined>>;
+}
+
+interface ReportItem {
+  id: string;
+  status: string;
+  description: string;
+  work_start: string;
+  work_end: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: { name: string; label: string };
+  };
+}
+
+interface RoleOption {
+  name: string;
+  label: string;
+}
+
+interface PaginationMeta {
+  halaman: number;
+  batas: number;
+  total: number;
+  total_halaman: number;
+}
+
+async function getAdminReports(
+  searchParams: URLSearchParams,
+  cookieHeader: string
+): Promise<{ reports: ReportItem[]; meta: PaginationMeta }> {
+  const url = new URL("/api/admin/reports", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  searchParams.forEach((v, k) => url.searchParams.set(k, v));
+
+  const res = await fetch(url.toString(), {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+  if (!res.ok) return { reports: [], meta: { halaman: 1, batas: 20, total: 0, total_halaman: 0 } };
+  const json = await res.json();
+  return { reports: json.data ?? [], meta: json.meta ?? { halaman: 1, batas: 20, total: 0, total_halaman: 0 } };
+}
+
+async function getAdminRoles(cookieHeader: string): Promise<RoleOption[]> {
+  const url = new URL("/api/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const res = await fetch(url.toString(), {
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data ?? [];
 }
 
 export default async function AdminReportsPage({ searchParams }: PageProps) {
@@ -29,55 +80,20 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
   const raw = await searchParams;
   const filters = reportFilterSchema.parse(raw);
 
-  // Build Prisma where clause
-  const where: Prisma.ReportWhereInput = {
-    deleted_at: null,
-    ...(filters.status && { status: filters.status }),
-    ...(filters.role && { user: { role: { name: filters.role } } }),
-    ...(filters.search && {
-      OR: [
-        { description: { contains: filters.search } },
-        { user: { name: { contains: filters.search } } },
-      ],
-    }),
-    ...(filters.date_from || filters.date_to
-      ? {
-          work_start: {
-            ...(filters.date_from && { gte: new Date(filters.date_from) }),
-            ...(filters.date_to && {
-              lte: new Date(filters.date_to + "T23:59:59"),
-            }),
-          },
-        }
-      : {}),
-  };
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
 
-  const [reports, total, roles] = await Promise.all([
-    prisma.report.findMany({
-      where,
-      orderBy: { created_at: "desc" },
-      skip: (filters.page - 1) * filters.limit,
-      take: filters.limit,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: { select: { name: true, label: true } },
-          },
-        },
-      },
-    }),
-    prisma.report.count({ where }),
-    prisma.role.findMany({
-      where: { is_active: true },
-      select: { name: true, label: true },
-      orderBy: { name: "asc" },
-    }),
+  const filterParams = new URLSearchParams();
+  Object.entries(raw).forEach(([k, v]) => { if (v) filterParams.set(k, v); });
+
+  const [{ reports, meta }, roles] = await Promise.all([
+    getAdminReports(filterParams, cookieHeader),
+    getAdminRoles(cookieHeader),
   ]);
 
-  const totalPages = Math.ceil(total / filters.limit);
+  const total = meta.total;
+  const totalPages = meta.total_halaman;
 
   // Build export PDF URL
   const exportParams = new URLSearchParams();
@@ -90,16 +106,16 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
 
   const canExport = hasPermission(session.user.permissions, PERMISSIONS.EXPORT_PDF);
 
-  function formatDate(d: Date) {
-    return d.toLocaleDateString("id-ID", {
+  function formatDate(d: string) {
+    return new Date(d).toLocaleDateString("id-ID", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
   }
 
-  function getDuration(start: Date, end: Date) {
-    const diff = Math.floor((end.getTime() - start.getTime()) / 60000);
+  function getDuration(start: string, end: string) {
+    const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 60000);
     const h = Math.floor(diff / 60);
     const m = diff % 60;
     return h > 0 ? `${h}j ${m}m` : `${m}m`;
@@ -123,9 +139,7 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
           <p style={{ color: "var(--color-muted)", marginTop: "0.25rem" }}>
             Total{" "}
             <strong style={{ color: "var(--color-dark)" }}>{total}</strong> laporan
-            {filters.status || filters.role || filters.search
-              ? " (difilter)"
-              : ""}
+            {filters.status || filters.role || filters.search ? " (difilter)" : ""}
           </p>
         </div>
         {canExport && (
@@ -202,17 +216,10 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontWeight: 600 }}>
-                        {formatDate(report.work_start)}
-                      </span>
+                      <span style={{ fontWeight: 600 }}>{formatDate(report.work_start)}</span>
                     </td>
                     <td>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-heading)",
-                          fontWeight: 700,
-                        }}
-                      >
+                      <span style={{ fontFamily: "var(--font-heading)", fontWeight: 700 }}>
                         {getDuration(report.work_start, report.work_end)}
                       </span>
                     </td>
