@@ -1,0 +1,83 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique   // "FRONTEND_DEVELOPER"
+  label       String                     // "Frontend Developer"
+  is_active   Boolean          @default(true)
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+  users       User[]
+  permissions RolePermission[]
+
+  @@index([name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        String           @unique   // "create_report"
+  description String?
+  created_at  DateTime         @default(now())
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  role_id       String
+  permission_id String
+  role          Role       @relation(fields: [role_id], references: [id])
+  permission    Permission @relation(fields: [permission_id], references: [id])
+
+  @@id([role_id, permission_id])
+  @@map("role_permissions")
+}
+
+model User {
+  id         String    @id @default(uuid())
+  name       String
+  email      String    @unique
+  password   String
+  role_id    String
+  role       Role      @relation(fields: [role_id], references: [id])
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+  reports    Report[]
+
+  @@index([email])
+  @@index([role_id])
+  @@index([deleted_at])
+  @@map("users")
+}
+
+model Report {
+  id               String    @id @default(uuid())
+  user_id          String
+  user             User      @relation(fields: [user_id], references: [id])
+  before_image_key String                   // object key di MinIO
+  after_image_key  String                   // object key di MinIO
+  description      String    @db.Text
+  work_start       DateTime
+  work_end         DateTime
+  status           String    @default("pending")  // pending|approved|rejected
+  reject_reason    String?                  // alasan reject dari admin
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  deleted_at       DateTime?
+
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("reports")
+}
