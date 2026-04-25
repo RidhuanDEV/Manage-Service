@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RegisterForm } from "@/components/forms/RegisterForm";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Daftar — Manage Service",
@@ -12,19 +13,21 @@ interface RoleOption {
   label: string;
 }
 
-// Fetch active non-ADMIN roles for the dropdown via API
+// Fetch active non-ADMIN roles for the dropdown directly from DB
 async function getAvailableRoles(): Promise<RoleOption[]> {
-  const url = new URL(
-    "/api/roles",
-    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
-  );
-  const res = await fetch(url.toString(), {
-    cache: "no-store",
-  });
-
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data ?? [];
+  try {
+    return await prisma.role.findMany({
+      where: {
+        is_active: true,
+        name: { not: "ADMIN" },
+      },
+      select: { id: true, name: true, label: true },
+      orderBy: { label: "asc" },
+    });
+  } catch (error) {
+    console.error("[RegisterPage] gagal mengambil role:", error);
+    return [];
+  }
 }
 
 export default async function RegisterPage() {

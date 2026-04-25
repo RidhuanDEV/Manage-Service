@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { paginationSchema } from "@/lib/validations";
-import { berhasilPaginated, berhasil, gagal } from "@/lib/response";
+import { berhasilPaginated, gagal } from "@/lib/response";
 
 // GET /api/admin/users  — paginated list of users with roles
 export async function GET(req: Request) {
