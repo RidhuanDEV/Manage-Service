@@ -4,6 +4,8 @@ import { z } from "zod";
 // Reusable field validators
 // ---------------------------------------------------------------------------
 
+export const idSchema = z.string().uuid("ID tidak valid");
+
 const emailField = z
   .string({ required_error: "Email wajib diisi" })
   .email("Format email tidak valid")

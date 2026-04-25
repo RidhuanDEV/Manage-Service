@@ -31,7 +31,9 @@ interface ReportDetail {
   };
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { id } = await params;
   return {
     title: `Laporan #${id.slice(0, 8).toUpperCase()} — Manage Service`,
@@ -39,8 +41,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-async function getReport(id: string, cookieHeader: string): Promise<ReportDetail | null> {
-  const url = new URL(`/api/reports/${id}`, process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+async function getReport(
+  id: string,
+  cookieHeader: string,
+): Promise<ReportDetail | null> {
+  const url = new URL(
+    `/api/reports/${id}`,
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   const res = await fetch(url.toString(), {
     headers: { Cookie: cookieHeader },
     cache: "no-store",
@@ -65,7 +73,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
 
   if (!report) notFound();
 
-  const isAdmin = hasPermission(session.user.permissions, PERMISSIONS.MANAGE_USERS);
+  const isAdmin = hasPermission(
+    session.user.permissions,
+    PERMISSIONS.MANAGE_USERS,
+  );
   if (!isAdmin && report.user_id !== session.user.id) {
     redirect("/dashboard");
   }
@@ -85,7 +96,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
   }
 
   function getDuration(start: string, end: string) {
-    const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+    const diff = Math.floor(
+      (new Date(end).getTime() - new Date(start).getTime()) / 60000,
+    );
     const h = Math.floor(diff / 60);
     const m = diff % 60;
     return h > 0 ? `${h} jam ${m} menit` : `${m} menit`;
@@ -105,7 +118,14 @@ export default async function ReportDetailPage({ params }: PageProps) {
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              marginBottom: "0.5rem",
+            }}
+          >
             <Link
               href="/dashboard"
               className="btn btn-secondary btn-sm"
@@ -116,7 +136,10 @@ export default async function ReportDetailPage({ params }: PageProps) {
           </div>
           <h1 className="section-title">Detail Laporan</h1>
           <p style={{ color: "var(--color-muted)", marginTop: "0.25rem" }}>
-            ID: <code style={{ fontFamily: "monospace", fontWeight: 700 }}>{id}</code>
+            ID:{" "}
+            <code style={{ fontFamily: "monospace", fontWeight: 700 }}>
+              {id}
+            </code>
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
@@ -143,10 +166,21 @@ export default async function ReportDetailPage({ params }: PageProps) {
         }}
       >
         {/* Info card */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div
+          className="card"
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
           {/* Status */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span className="label" style={{ margin: 0 }}>Status</span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <span className="label" style={{ margin: 0 }}>
+              Status
+            </span>
             <StatusBadge status={report.status} />
           </div>
 
@@ -199,7 +233,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
           {/* Waktu Kerja */}
           <div>
             <span className="label">Waktu Mulai</span>
-            <p style={{ fontWeight: 600 }}>{formatDateTime(report.work_start)}</p>
+            <p style={{ fontWeight: 600 }}>
+              {formatDateTime(report.work_start)}
+            </p>
           </div>
           <div>
             <span className="label">Waktu Selesai</span>
@@ -237,7 +273,13 @@ export default async function ReportDetailPage({ params }: PageProps) {
 
           {/* Timestamps */}
           <div style={{ borderTop: "var(--border)", paddingTop: "0.875rem" }}>
-            <p style={{ fontSize: "0.8125rem", color: "var(--color-muted)", fontWeight: 600 }}>
+            <p
+              style={{
+                fontSize: "0.8125rem",
+                color: "var(--color-muted)",
+                fontWeight: 600,
+              }}
+            >
               Dibuat:{" "}
               {new Date(report.created_at).toLocaleString("id-ID", {
                 dateStyle: "medium",
@@ -245,7 +287,14 @@ export default async function ReportDetailPage({ params }: PageProps) {
               })}
             </p>
             {report.updated_at !== report.created_at && (
-              <p style={{ fontSize: "0.8125rem", color: "var(--color-muted)", fontWeight: 600, marginTop: "0.125rem" }}>
+              <p
+                style={{
+                  fontSize: "0.8125rem",
+                  color: "var(--color-muted)",
+                  fontWeight: 600,
+                  marginTop: "0.125rem",
+                }}
+              >
                 Diperbarui:{" "}
                 {new Date(report.updated_at).toLocaleString("id-ID", {
                   dateStyle: "medium",
@@ -257,7 +306,9 @@ export default async function ReportDetailPage({ params }: PageProps) {
         </div>
 
         {/* Images card */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
           {/* Before image */}
           <div className="card">
             <span

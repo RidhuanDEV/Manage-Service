@@ -12,7 +12,7 @@ const rateLimitStore = new Map<string, RateEntry>();
 function checkRateLimit(
   key: string,
   maxRequests: number,
-  windowMs: number
+  windowMs: number,
 ): boolean {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
@@ -58,31 +58,37 @@ export default auth((req) => {
 
   // Rate limit — /api/auth/callback/credentials (login)
   if (
-    pathname === "/api/auth/callback/credentials" ||
-    pathname === "/api/auth/signin"
+    (pathname === "/api/auth/callback/credentials" || pathname === "/api/auth/signin") &&
+    req.method === "POST"
   ) {
     const allowed = checkRateLimit(
       `login:${ip}`,
-      20,
-      15 * 60 * 1000 // 20 req / 15 menit
+      150,
+      15 * 60 * 1000, // 20 req / 15 menit
     );
     if (!allowed) {
       return Response.json(
-        { sukses: false, pesan: "Terlalu banyak permintaan, coba lagi dalam beberapa saat" },
-        { status: 429 }
+        {
+          sukses: false,
+          pesan: "Terlalu banyak permintaan, coba lagi dalam beberapa saat",
+        },
+        { status: 429 },
       );
     }
   }
 
-  // Rate limit — /register
-  if (pathname === "/register") {
+  // Rate limit — /register (Hanya POST untuk menghindari Next.js Link prefetch menghabiskan limit)
+  if (pathname === "/register" && req.method === "POST") {
     const allowed = checkRateLimit(
       `register:${ip}`,
       15,
-      60 * 60 * 1000 // 15 req / 1 jam
+      60 * 60 * 1000, // 15 req / 1 jam
     );
     if (!allowed) {
-      return NextResponse.redirect(new URL("/register?error=rate_limit", nextUrl));
+      return Response.json(
+        { sukses: false, pesan: "Terlalu banyak permintaan pendaftaran, coba lagi dalam 1 jam." },
+        { status: 429 }
+      );
     }
   }
 
@@ -95,7 +101,7 @@ export default auth((req) => {
   if (!isLoggedIn && PROTECTED_PATHS.some((p) => pathname.startsWith(p))) {
     const callbackUrl = encodeURIComponent(pathname);
     return NextResponse.redirect(
-      new URL(`/login?callbackUrl=${callbackUrl}`, nextUrl)
+      new URL(`/login?callbackUrl=${callbackUrl}`, nextUrl),
     );
   }
 

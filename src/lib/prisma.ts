@@ -10,12 +10,17 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient() {
+  const host = process.env.DB_HOST ?? "mysql";
+  
+  // Log ini akan muncul di terminal Docker (docker logs manage_service_app)
+  console.log(`[Prisma] Inisialisasi koneksi ke host: ${host}`);
+
   const adapter = new PrismaMariaDb({
-    host:            process.env.DB_HOST     ?? "127.0.0.1",
+    host,
     port:            Number(process.env.DB_PORT ?? 3306),
     database:        process.env.DB_NAME     ?? "manage_service",
     user:            process.env.DB_USER     ?? "root",
-    password:        process.env.DB_ROOT_PASSWORD ?? "",
+    password:        process.env.DB_PASSWORD ?? process.env.DB_ROOT_PASSWORD ?? "",
     connectionLimit: 10,
   });
 

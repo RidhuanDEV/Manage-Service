@@ -13,7 +13,15 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const { page, limit } = paginationSchema.parse(Object.fromEntries(searchParams));
+  const parsed = paginationSchema.safeParse(Object.fromEntries(searchParams));
+  if (!parsed.success) {
+    const kesalahan = parsed.error.errors.map((e) => ({
+      kolom: String(e.path[0] ?? ""),
+      pesan: e.message,
+    }));
+    return gagal("Data yang dikirim tidak valid", 400, kesalahan);
+  }
+  const { page, limit } = parsed.data;
   const search = searchParams.get("search") ?? "";
 
   const where = {

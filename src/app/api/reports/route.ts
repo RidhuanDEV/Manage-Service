@@ -8,7 +8,15 @@ export async function GET(req: Request) {
   if (!session) return gagal("Sesi Anda telah berakhir, silakan login kembali", 401);
 
   const { searchParams } = new URL(req.url);
-  const { page, limit } = paginationSchema.parse(Object.fromEntries(searchParams));
+  const parsed = paginationSchema.safeParse(Object.fromEntries(searchParams));
+  if (!parsed.success) {
+    const kesalahan = parsed.error.errors.map((e) => ({
+      kolom: String(e.path[0] ?? ""),
+      pesan: e.message,
+    }));
+    return gagal("Data yang dikirim tidak valid", 400, kesalahan);
+  }
+  const { page, limit } = parsed.data;
 
   const where = { user_id: session.user.id, deleted_at: null } as const;
 

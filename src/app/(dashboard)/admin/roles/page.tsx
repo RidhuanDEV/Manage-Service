@@ -1,7 +1,11 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { CreateRoleModal, EditRoleModal, DeleteRoleButton } from "@/components/admin/RoleControls";
+import {
+  CreateRoleModal,
+  EditRoleModal,
+  DeleteRoleButton,
+} from "@/components/admin/RoleControls";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -24,15 +28,23 @@ interface Role {
   _count: { users: number };
 }
 
-async function getRolesAndPermissions(cookieHeader: string): Promise<{ roles: Role[]; permissions: Permission[] }> {
-  const url = new URL("/api/admin/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+async function getRolesAndPermissions(
+  cookieHeader: string,
+): Promise<{ roles: Role[]; permissions: Permission[] }> {
+  const url = new URL(
+    "/api/admin/roles",
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   const res = await fetch(url.toString(), {
     headers: { Cookie: cookieHeader },
     cache: "no-store",
   });
   if (!res.ok) return { roles: [], permissions: [] };
   const json = await res.json();
-  return { roles: json.data?.roles ?? [], permissions: json.data?.permissions ?? [] };
+  return {
+    roles: json.data?.roles ?? [],
+    permissions: json.data?.permissions ?? [],
+  };
 }
 
 export default async function AdminRolesPage() {
@@ -64,7 +76,8 @@ export default async function AdminRolesPage() {
         <div>
           <h1 className="section-title">Kelola Role</h1>
           <p style={{ color: "var(--color-muted)", marginTop: "0.25rem" }}>
-            {roles.length} role terdaftar · {permissions.length} permission tersedia
+            {roles.length} role terdaftar · {permissions.length} permission
+            tersedia
           </p>
         </div>
         <CreateRoleModal permissions={permissions} />
@@ -95,11 +108,23 @@ export default async function AdminRolesPage() {
           {permissions.map((p) => (
             <div
               key={p.id}
-              style={{ background: "#fff", border: "2px solid #000", padding: "0.25rem 0.625rem" }}
+              style={{
+                background: "#fff",
+                border: "2px solid #000",
+                padding: "0.25rem 0.625rem",
+              }}
             >
-              <span style={{ fontSize: "0.8rem", fontWeight: 700 }}>{p.name}</span>
+              <span style={{ fontSize: "0.8rem", fontWeight: 700 }}>
+                {p.name}
+              </span>
               {p.description && (
-                <span style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginLeft: "0.375rem" }}>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--color-muted)",
+                    marginLeft: "0.375rem",
+                  }}
+                >
                   — {p.description}
                 </span>
               )}
@@ -126,7 +151,14 @@ export default async function AdminRolesPage() {
                 }}
               >
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <h2
                       style={{
                         fontFamily: "var(--font-heading)",
@@ -177,7 +209,13 @@ export default async function AdminRolesPage() {
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", marginTop: "0.25rem" }}>
+                  <p
+                    style={{
+                      fontSize: "0.875rem",
+                      color: "var(--color-muted)",
+                      marginTop: "0.25rem",
+                    }}
+                  >
                     {role._count.users} user menggunakan role ini
                   </p>
                 </div>
@@ -203,11 +241,22 @@ export default async function AdminRolesPage() {
                   Permissions ({role.permissions.length})
                 </p>
                 {role.permissions.length === 0 ? (
-                  <p style={{ fontSize: "0.875rem", color: "var(--color-muted)" }}>
+                  <p
+                    style={{
+                      fontSize: "0.875rem",
+                      color: "var(--color-muted)",
+                    }}
+                  >
                     Tidak ada permission
                   </p>
                 ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.375rem",
+                    }}
+                  >
                     {role.permissions.map(({ permission }) => (
                       <span
                         key={permission.id}

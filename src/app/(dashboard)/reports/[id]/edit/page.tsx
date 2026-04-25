@@ -17,7 +17,9 @@ interface ReportEditData {
   user_id: string;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { id } = await params;
   return {
     title: `Edit Laporan #${id.slice(0, 8).toUpperCase()} — Manage Service`,
@@ -25,8 +27,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-async function getReport(id: string, cookieHeader: string): Promise<ReportEditData | null> {
-  const url = new URL(`/api/reports/${id}`, process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+async function getReport(
+  id: string,
+  cookieHeader: string,
+): Promise<ReportEditData | null> {
+  const url = new URL(
+    `/api/reports/${id}`,
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   const res = await fetch(url.toString(), {
     headers: { Cookie: cookieHeader },
     cache: "no-store",
@@ -64,7 +72,14 @@ export default async function EditReportPage({ params }: PageProps) {
     <div>
       {/* Header */}
       <div style={{ marginBottom: "1.75rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            marginBottom: "0.5rem",
+          }}
+        >
           <Link
             href={`/reports/${id}`}
             className="btn btn-secondary btn-sm"
@@ -76,8 +91,8 @@ export default async function EditReportPage({ params }: PageProps) {
         <h1 className="section-title">Edit Laporan</h1>
         <p style={{ color: "var(--color-muted)", marginTop: "0.25rem" }}>
           Hanya laporan dengan status{" "}
-          <strong style={{ color: "var(--color-pending)" }}>Menunggu</strong> yang dapat
-          diedit.
+          <strong style={{ color: "var(--color-pending)" }}>Menunggu</strong>{" "}
+          yang dapat diedit.
         </p>
       </div>
 
@@ -98,8 +113,8 @@ export default async function EditReportPage({ params }: PageProps) {
         <div>
           <p style={{ fontWeight: 700, fontSize: "0.875rem" }}>Perhatian</p>
           <p style={{ fontSize: "0.875rem", color: "var(--color-muted)" }}>
-            Setelah laporan disetujui atau ditolak, laporan tidak dapat lagi diedit.
-            Foto yang tidak diganti akan tetap menggunakan foto lama.
+            Setelah laporan disetujui atau ditolak, laporan tidak dapat lagi
+            diedit. Foto yang tidak diganti akan tetap menggunakan foto lama.
           </p>
         </div>
       </div>

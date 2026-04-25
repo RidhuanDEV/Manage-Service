@@ -1,0 +1,16 @@
+node_modules
+.next
+.docker
+.git
+.env
+Dockerfile
+docker-compose.yml
+npm-debug.log
+README.md
+nginx
+build
+dist
+out
+# Abaikan folder data mysql dan minio
+.docker/mysql
+.docker/minio_data

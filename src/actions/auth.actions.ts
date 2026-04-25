@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 // Register — buat user baru
 // ---------------------------------------------------------------------------
 export async function registerUser(
-  input: RegisterInput
+  input: RegisterInput,
 ): Promise<ActionResult<{ id: string; email: string }>> {
   // 1. Validate input
   const parsed = registerSchema.safeParse(input);
@@ -46,7 +46,9 @@ export async function registerUser(
       return {
         sukses: false,
         pesan: "Data yang dikirim tidak valid",
-        kesalahan: [{ kolom: "role_id", pesan: "Role tidak ditemukan atau tidak aktif" }],
+        kesalahan: [
+          { kolom: "role_id", pesan: "Role tidak ditemukan atau tidak aktif" },
+        ],
       };
     }
 
@@ -55,7 +57,12 @@ export async function registerUser(
       return {
         sukses: false,
         pesan: "Anda tidak memiliki akses untuk melakukan tindakan ini",
-        kesalahan: [{ kolom: "role_id", pesan: "Role ADMIN tidak dapat dipilih saat registrasi" }],
+        kesalahan: [
+          {
+            kolom: "role_id",
+            pesan: "Role ADMIN tidak dapat dipilih saat registrasi",
+          },
+        ],
       };
     }
 
@@ -77,4 +84,3 @@ export async function registerUser(
     };
   }
 }
-

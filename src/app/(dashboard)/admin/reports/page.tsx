@@ -45,22 +45,35 @@ interface PaginationMeta {
 
 async function getAdminReports(
   searchParams: URLSearchParams,
-  cookieHeader: string
+  cookieHeader: string,
 ): Promise<{ reports: ReportItem[]; meta: PaginationMeta }> {
-  const url = new URL("/api/admin/reports", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const url = new URL(
+    "/api/admin/reports",
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   searchParams.forEach((v, k) => url.searchParams.set(k, v));
 
   const res = await fetch(url.toString(), {
     headers: { Cookie: cookieHeader },
     cache: "no-store",
   });
-  if (!res.ok) return { reports: [], meta: { halaman: 1, batas: 20, total: 0, total_halaman: 0 } };
+  if (!res.ok)
+    return {
+      reports: [],
+      meta: { halaman: 1, batas: 20, total: 0, total_halaman: 0 },
+    };
   const json = await res.json();
-  return { reports: json.data ?? [], meta: json.meta ?? { halaman: 1, batas: 20, total: 0, total_halaman: 0 } };
+  return {
+    reports: json.data ?? [],
+    meta: json.meta ?? { halaman: 1, batas: 20, total: 0, total_halaman: 0 },
+  };
 }
 
 async function getAdminRoles(cookieHeader: string): Promise<RoleOption[]> {
-  const url = new URL("/api/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const url = new URL(
+    "/api/roles",
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   const res = await fetch(url.toString(), {
     headers: { Cookie: cookieHeader },
     cache: "no-store",
@@ -85,7 +98,9 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
   const cookieHeader = cookieStore.toString();
 
   const filterParams = new URLSearchParams();
-  Object.entries(raw).forEach(([k, v]) => { if (v) filterParams.set(k, v); });
+  Object.entries(raw).forEach(([k, v]) => {
+    if (v) filterParams.set(k, v);
+  });
 
   const [{ reports, meta }, roles] = await Promise.all([
     getAdminReports(filterParams, cookieHeader),
@@ -104,7 +119,10 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
   if (filters.search) exportParams.set("search", filters.search);
   const exportUrl = `/api/admin/reports/export-pdf?${exportParams.toString()}`;
 
-  const canExport = hasPermission(session.user.permissions, PERMISSIONS.EXPORT_PDF);
+  const canExport = hasPermission(
+    session.user.permissions,
+    PERMISSIONS.EXPORT_PDF,
+  );
 
   function formatDate(d: string) {
     return new Date(d).toLocaleDateString("id-ID", {
@@ -115,7 +133,9 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
   }
 
   function getDuration(start: string, end: string) {
-    const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+    const diff = Math.floor(
+      (new Date(end).getTime() - new Date(start).getTime()) / 60000,
+    );
     const h = Math.floor(diff / 60);
     const m = diff % 60;
     return h > 0 ? `${h}j ${m}m` : `${m}m`;
@@ -138,8 +158,11 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
           <h1 className="section-title">Admin Laporan</h1>
           <p style={{ color: "var(--color-muted)", marginTop: "0.25rem" }}>
             Total{" "}
-            <strong style={{ color: "var(--color-dark)" }}>{total}</strong> laporan
-            {filters.status || filters.role || filters.search ? " (difilter)" : ""}
+            <strong style={{ color: "var(--color-dark)" }}>{total}</strong>{" "}
+            laporan
+            {filters.status || filters.role || filters.search
+              ? " (difilter)"
+              : ""}
           </p>
         </div>
         {canExport && (
@@ -168,9 +191,17 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
       {/* Table */}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {reports.length === 0 ? (
-          <div style={{ padding: "3rem", textAlign: "center", color: "var(--color-muted)" }}>
+          <div
+            style={{
+              padding: "3rem",
+              textAlign: "center",
+              color: "var(--color-muted)",
+            }}
+          >
             <p style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>📋</p>
-            <p style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Tidak ada laporan</p>
+            <p style={{ fontWeight: 700, fontSize: "1.0625rem" }}>
+              Tidak ada laporan
+            </p>
             <p style={{ marginTop: "0.25rem", fontSize: "0.9rem" }}>
               Coba ubah atau hapus filter yang aktif.
             </p>
@@ -193,9 +224,16 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
                 {reports.map((report) => (
                   <tr key={report.id}>
                     <td>
-                      <span style={{ fontWeight: 700 }}>{report.user.name}</span>
+                      <span style={{ fontWeight: 700 }}>
+                        {report.user.name}
+                      </span>
                       <br />
-                      <span style={{ fontSize: "0.8125rem", color: "var(--color-muted)" }}>
+                      <span
+                        style={{
+                          fontSize: "0.8125rem",
+                          color: "var(--color-muted)",
+                        }}
+                      >
                         {report.user.email}
                       </span>
                     </td>
@@ -216,10 +254,17 @@ export default async function AdminReportsPage({ searchParams }: PageProps) {
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontWeight: 600 }}>{formatDate(report.work_start)}</span>
+                      <span style={{ fontWeight: 600 }}>
+                        {formatDate(report.work_start)}
+                      </span>
                     </td>
                     <td>
-                      <span style={{ fontFamily: "var(--font-heading)", fontWeight: 700 }}>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-heading)",
+                          fontWeight: 700,
+                        }}
+                      >
                         {getDuration(report.work_start, report.work_end)}
                       </span>
                     </td>

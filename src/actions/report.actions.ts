@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { deleteFromMinIO, uploadToMinIO } from "@/lib/minio";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { createReportBaseSchema, updateReportSchema } from "@/lib/validations";
+import { createReportBaseSchema, updateReportSchema, idSchema } from "@/lib/validations";
 import type { ActionResult } from "@/types";
 import { v4 as uuid } from "uuid";
 import { revalidatePath } from "next/cache";
@@ -178,6 +178,11 @@ export async function updateReport(
     return { sukses: false, pesan: "Sesi Anda telah berakhir, silakan login kembali" };
   }
 
+  const parsedId = idSchema.safeParse(reportId);
+  if (!parsedId.success) {
+    return { sukses: false, pesan: "Data tidak ditemukan" };
+  }
+
   // Fetch laporan — verifikasi ownership + status
   const report = await prisma.report.findFirst({
     where: { id: reportId, deleted_at: null },
@@ -293,8 +298,13 @@ export async function deleteReport(reportId: string): Promise<ActionResult> {
     return { sukses: false, pesan: "Sesi Anda telah berakhir, silakan login kembali" };
   }
 
+  const parsedId = idSchema.safeParse(reportId);
+  if (!parsedId.success) {
+    return { sukses: false, pesan: "Data tidak ditemukan" };
+  }
+
   const report = await prisma.report.findFirst({
-    where: { id: reportId, deleted_at: null },
+    where: { id: parsedId.data, deleted_at: null },
     select: {
       id: true,
       user_id: true,

@@ -8,6 +8,7 @@ import {
   updateUserRoleSchema,
   createRoleSchema,
   updateRoleSchema,
+  idSchema,
   type CreateRoleInput,
   type UpdateRoleInput,
 } from "@/lib/validations";
@@ -135,8 +136,11 @@ export async function toggleUserStatus(userId: string): Promise<ActionResult> {
   const guard = await requirePermission(PERMISSIONS.MANAGE_USERS);
   if (guard) return guard;
 
+  const parsedId = idSchema.safeParse(userId);
+  if (!parsedId.success) return { sukses: false, pesan: "Data tidak ditemukan" };
+
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { id: parsedId.data },
     select: { id: true, deleted_at: true, role: { select: { name: true } } },
   });
 
@@ -260,7 +264,10 @@ export async function updateRole(
     };
   }
 
-  const role = await prisma.role.findUnique({ where: { id: roleId }, select: { id: true, name: true } });
+  const parsedId = idSchema.safeParse(roleId);
+  if (!parsedId.success) return { sukses: false, pesan: "Data tidak ditemukan" };
+
+  const role = await prisma.role.findUnique({ where: { id: parsedId.data }, select: { id: true, name: true } });
   if (!role) return { sukses: false, pesan: "Data tidak ditemukan" };
 
   const { label, permissionIds } = parsed.data;
@@ -312,8 +319,11 @@ export async function deleteRole(roleId: string): Promise<ActionResult> {
   const guard = await requirePermission(PERMISSIONS.MANAGE_ROLES);
   if (guard) return guard;
 
+  const parsedId = idSchema.safeParse(roleId);
+  if (!parsedId.success) return { sukses: false, pesan: "Data tidak ditemukan" };
+
   const role = await prisma.role.findUnique({
-    where: { id: roleId },
+    where: { id: parsedId.data },
     select: { id: true, name: true, _count: { select: { users: true } } },
   });
 
@@ -368,7 +378,10 @@ export async function updateRolePermissions(
     };
   }
 
-  const role = await prisma.role.findUnique({ where: { id: roleId }, select: { id: true } });
+  const parsedId = idSchema.safeParse(roleId);
+  if (!parsedId.success) return { sukses: false, pesan: "Data tidak ditemukan" };
+
+  const role = await prisma.role.findUnique({ where: { id: parsedId.data }, select: { id: true } });
   if (!role) return { sukses: false, pesan: "Data tidak ditemukan" };
 
   try {

@@ -33,7 +33,15 @@ export function LoginForm() {
     });
 
     if (result?.error) {
-      setServerError("Email atau password salah. Silakan coba lagi.");
+      // In Auth.js v5, the custom error is usually returned in `result.code`.
+      // If `result.code` exists and is not "CredentialsSignin", use it.
+      // Otherwise fallback to result.error or generic text.
+      const errorMessage =
+        result.code && result.code !== "CredentialsSignin"
+          ? result.code
+          : "Email atau password salah. Silakan coba lagi.";
+
+      setServerError(errorMessage);
       return;
     }
 
@@ -97,7 +105,11 @@ export function LoginForm() {
         Belum punya akun?{" "}
         <Link
           href="/register"
-          style={{ fontWeight: 700, textDecoration: "underline", color: "#000" }}
+          style={{
+            fontWeight: 700,
+            textDecoration: "underline",
+            color: "#000",
+          }}
         >
           Daftar sekarang
         </Link>

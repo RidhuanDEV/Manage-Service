@@ -4,9 +4,10 @@ import { useSession } from "next-auth/react";
 // Server-side permission check (Server Component, Server Action)
 // ---------------------------------------------------------------------------
 export function hasPermission(
-  permissions: string[],
+  permissions: string[] | undefined | null,
   required: string
 ): boolean {
+  if (!permissions) return false;
   return permissions.includes(required);
 }
 
@@ -14,9 +15,10 @@ export function hasPermission(
 // Multi-permission check — returns true if ALL required permissions are present
 // ---------------------------------------------------------------------------
 export function hasAllPermissions(
-  permissions: string[],
+  permissions: string[] | undefined | null,
   required: string[]
 ): boolean {
+  if (!permissions) return false;
   return required.every((p) => permissions.includes(p));
 }
 
@@ -24,9 +26,10 @@ export function hasAllPermissions(
 // Multi-permission check — returns true if ANY required permission is present
 // ---------------------------------------------------------------------------
 export function hasAnyPermission(
-  permissions: string[],
+  permissions: string[] | undefined | null,
   required: string[]
 ): boolean {
+  if (!permissions) return false;
   return required.some((p) => permissions.includes(p));
 }
 

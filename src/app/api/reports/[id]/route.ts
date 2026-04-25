@@ -4,6 +4,8 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { berhasil, gagal } from "@/lib/response";
 import { notFound } from "next/navigation";
 
+import { idSchema } from "@/lib/validations";
+
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
@@ -13,9 +15,12 @@ export async function GET(_req: Request, { params }: RouteContext) {
   if (!session) return gagal("Sesi Anda telah berakhir, silakan login kembali", 401);
 
   const { id } = await params;
+  
+  const parsedId = idSchema.safeParse(id);
+  if (!parsedId.success) return gagal("Data tidak ditemukan", 404);
 
   const report = await prisma.report.findFirst({
-    where: { id, deleted_at: null },
+    where: { id: parsedId.data, deleted_at: null },
     include: {
       user: {
         select: {

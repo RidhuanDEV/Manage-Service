@@ -14,11 +14,14 @@ interface RoleOption {
 
 // Fetch active non-ADMIN roles for the dropdown via API
 async function getAvailableRoles(): Promise<RoleOption[]> {
-  const url = new URL("/api/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const url = new URL(
+    "/api/roles",
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   const res = await fetch(url.toString(), {
-    cache: "no-store", // Or revalidate if you prefer
+    cache: "no-store",
   });
-  
+
   if (!res.ok) return [];
   const json = await res.json();
   return json.data ?? [];
@@ -58,7 +61,13 @@ export default async function RegisterPage() {
           >
             Manage Service
           </h1>
-          <p style={{ marginTop: "0.5rem", color: "var(--color-muted)", fontWeight: 500 }}>
+          <p
+            style={{
+              marginTop: "0.5rem",
+              color: "var(--color-muted)",
+              fontWeight: 500,
+            }}
+          >
             Laporan Karyawan Internal
           </p>
         </div>

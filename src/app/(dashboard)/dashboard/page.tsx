@@ -33,28 +33,43 @@ interface PageProps {
 }
 
 async function getReports(
-  userId: string,
+  cookieHeader: string,
   page: number,
-  limit: number
+  limit: number,
 ): Promise<{ reports: ReportItem[]; meta: PaginationMeta }> {
   // Server component calling its own API — use absolute URL via process.env
-  const url = new URL("/api/reports", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const url = new URL(
+    "/api/reports",
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
 
   const res = await fetch(url.toString(), {
     headers: {
-      // Forward cookie for auth — needed for server-side fetch to own API
-      Cookie: `next-auth.session-token=${userId}`,
+      // Forward all cookies for auth
+      Cookie: cookieHeader,
     },
     // No caching — always fresh data
     cache: "no-store",
   });
 
-  if (!res.ok) return { reports: [], meta: { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
+  if (!res.ok)
+    return {
+      reports: [],
+      meta: { halaman: page, batas: limit, total: 0, total_halaman: 0 },
+    };
 
   const json = await res.json();
-  return { reports: json.data ?? [], meta: json.meta ?? { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
+  return {
+    reports: json.data ?? [],
+    meta: json.meta ?? {
+      halaman: page,
+      batas: limit,
+      total: 0,
+      total_halaman: 0,
+    },
+  };
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
@@ -64,7 +79,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const { page, limit } = paginationSchema.parse(params);
 
-  const { reports, meta } = await getReports(session.user.id, page, limit);
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  const { reports, meta } = await getReports(cookieHeader, page, limit);
 
   const total = meta.total;
   const totalPages = meta.total_halaman;
@@ -78,11 +97,16 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   }
 
   function formatTime(d: string) {
-    return new Date(d).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    return new Date(d).toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
 
   function getDuration(start: string, end: string) {
-    const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+    const diff = Math.floor(
+      (new Date(end).getTime() - new Date(start).getTime()) / 60000,
+    );
     const h = Math.floor(diff / 60);
     const m = diff % 60;
     return h > 0 ? `${h}j ${m}m` : `${m}m`;
@@ -105,11 +129,17 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           <h1 className="section-title">Dashboard</h1>
           <p style={{ color: "var(--color-muted)", marginTop: "0.25rem" }}>
             Selamat datang,{" "}
-            <strong style={{ color: "var(--color-dark)" }}>{session.user.name}</strong> —{" "}
-            {session.user.role?.label}
+            <strong style={{ color: "var(--color-dark)" }}>
+              {session.user.name}
+            </strong>{" "}
+            — {session.user.role?.label}
           </p>
         </div>
-        <Link href="/reports/new" className="btn btn-primary" id="btn-buat-laporan">
+        <Link
+          href="/reports/new"
+          className="btn btn-primary"
+          id="btn-buat-laporan"
+        >
           + Buat Laporan
         </Link>
       </div>
@@ -253,7 +283,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                           color: "var(--color-muted)",
                         }}
                       >
-                        {formatTime(report.work_start)} – {formatTime(report.work_end)}
+                        {formatTime(report.work_start)} –{" "}
+                        {formatTime(report.work_end)}
                       </span>
                     </td>
                     <td>
@@ -295,7 +326,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                       <StatusBadge status={report.status} />
                     </td>
                     <td style={{ textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.5rem",
+                          justifyContent: "flex-end",
+                        }}
+                      >
                         <Link
                           href={`/reports/${report.id}`}
                           className="btn btn-secondary btn-sm"

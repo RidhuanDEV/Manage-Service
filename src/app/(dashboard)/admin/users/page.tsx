@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { paginationSchema } from "@/lib/validations";
 import { Pagination } from "@/components/ui/Pagination";
-import { UpdateUserRoleModal, ToggleUserButton } from "@/components/admin/UserControls";
+import {
+  UpdateUserRoleModal,
+  ToggleUserButton,
+} from "@/components/admin/UserControls";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -42,9 +45,12 @@ async function getUsers(
   page: number,
   limit: number,
   search: string,
-  cookieHeader: string
+  cookieHeader: string,
 ): Promise<{ users: UserItem[]; meta: PaginationMeta }> {
-  const url = new URL("/api/admin/users", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const url = new URL(
+    "/api/admin/users",
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
   if (search) url.searchParams.set("search", search);
@@ -54,15 +60,30 @@ async function getUsers(
     cache: "no-store",
   });
 
-  if (!res.ok) return { users: [], meta: { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
+  if (!res.ok)
+    return {
+      users: [],
+      meta: { halaman: page, batas: limit, total: 0, total_halaman: 0 },
+    };
 
   const json = await res.json();
-  return { users: json.data ?? [], meta: json.meta ?? { halaman: page, batas: limit, total: 0, total_halaman: 0 } };
+  return {
+    users: json.data ?? [],
+    meta: json.meta ?? {
+      halaman: page,
+      batas: limit,
+      total: 0,
+      total_halaman: 0,
+    },
+  };
 }
 
 async function getRoles(cookieHeader: string): Promise<RoleOption[]> {
   // Reuse the admin roles endpoint but only need basic list — use public roles API
-  const url = new URL("/api/roles", process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+  const url = new URL(
+    "/api/roles",
+    process.env.INTERNAL_API_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+  );
   const res = await fetch(url.toString(), {
     headers: { Cookie: cookieHeader },
     cache: "no-store",
@@ -117,8 +138,14 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       </div>
 
       {/* Search bar */}
-      <div className="card" style={{ marginBottom: "1.25rem", padding: "1rem 1.25rem" }}>
-        <form method="GET" style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
+      <div
+        className="card"
+        style={{ marginBottom: "1.25rem", padding: "1rem 1.25rem" }}
+      >
+        <form
+          method="GET"
+          style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end" }}
+        >
           <div className="form-group" style={{ flex: 1 }}>
             <span className="label">Cari User</span>
             <input
@@ -134,7 +161,11 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
             Cari
           </button>
           {search && (
-            <a href="/admin/users" className="btn btn-secondary" id="btn-reset-user-search">
+            <a
+              href="/admin/users"
+              className="btn btn-secondary"
+              id="btn-reset-user-search"
+            >
               Reset
             </a>
           )}
@@ -144,7 +175,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       {/* Table */}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {users.length === 0 ? (
-          <div style={{ padding: "3rem", textAlign: "center", color: "var(--color-muted)" }}>
+          <div
+            style={{
+              padding: "3rem",
+              textAlign: "center",
+              color: "var(--color-muted)",
+            }}
+          >
             <p style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>👥</p>
             <p style={{ fontWeight: 700 }}>Tidak ada user ditemukan</p>
           </div>
@@ -184,17 +221,27 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                           </span>
                         )}
                         <br />
-                        <span style={{ fontSize: "0.8125rem", color: "var(--color-muted)" }}>
+                        <span
+                          style={{
+                            fontSize: "0.8125rem",
+                            color: "var(--color-muted)",
+                          }}
+                        >
                           Bergabung{" "}
-                          {new Date(user.created_at).toLocaleDateString("id-ID", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {new Date(user.created_at).toLocaleDateString(
+                            "id-ID",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )}
                         </span>
                       </td>
                       <td>
-                        <span style={{ fontSize: "0.9rem", wordBreak: "break-all" }}>
+                        <span
+                          style={{ fontSize: "0.9rem", wordBreak: "break-all" }}
+                        >
                           {user.email}
                         </span>
                       </td>

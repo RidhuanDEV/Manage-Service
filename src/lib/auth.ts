@@ -1,14 +1,38 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import type { NextAuthConfig } from "next-auth";
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 // ---------------------------------------------------------------------------
 // Auth.js v5 config — Credentials provider + JWT strategy + RBAC
 // ---------------------------------------------------------------------------
 
+import { AuthError } from "next-auth";
+
+class CustomAuthError extends AuthError {
+  constructor(message: string) {
+    super();
+    this.type = message as any;
+  }
+}
+
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://");
+const cookiePrefix = useSecureCookies ? "__Secure-" : "";
+
 const authConfig: NextAuthConfig = {
+  trustHost: true,
+  cookies: {
+    sessionToken: {
+      name: `${cookiePrefix}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
   providers: [
     Credentials({
       name: "credentials",
@@ -17,17 +41,18 @@ const authConfig: NextAuthConfig = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.email || !credentials?.password) {
+          throw new CustomAuthError("Data kredensial tidak lengkap");
+        }
 
         const email = String(credentials.email).toLowerCase().trim();
         const password = String(credentials.password);
 
         try {
-          // Fetch user + role + permissions
           const user = await prisma.user.findFirst({
             where: {
               email,
-              deleted_at: null, // exclude soft-deleted users
+              deleted_at: null, 
             },
             include: {
               role: {
@@ -40,13 +65,23 @@ const authConfig: NextAuthConfig = {
             },
           });
 
-          if (!user || !user.role.is_active) return null;
+          if (!user) {
+            throw new CustomAuthError(
+              "Email tidak terdaftar atau telah dihapus",
+            );
+          }
+
+          if (!user.role.is_active) {
+            throw new CustomAuthError("Role akun Anda sedang dinonaktifkan");
+          }
 
           const isValid = await bcrypt.compare(password, user.password);
-          if (!isValid) return null;
+          if (!isValid) {
+            throw new CustomAuthError("Password yang Anda masukkan salah");
+          }
 
           const permissions = user.role.permissions.map(
-            (rp) => rp.permission.name
+            (rp) => rp.permission.name,
           );
 
           return {
@@ -61,8 +96,13 @@ const authConfig: NextAuthConfig = {
             permissions,
           };
         } catch (error) {
+          if (error instanceof CustomAuthError) {
+            throw error;
+          }
           console.error("[Auth] authorize error:", error);
-          return null;
+          throw new CustomAuthError(
+            "Terjadi kesalahan pada server, silakan hubungi administrator",
+          );
         }
       },
     }),
@@ -70,7 +110,6 @@ const authConfig: NextAuthConfig = {
 
   callbacks: {
     async jwt({ token, user }) {
-      // First login: embed role + permissions into JWT
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -80,10 +119,15 @@ const authConfig: NextAuthConfig = {
     },
 
     async session({ session, token }) {
-      // Expose JWT data to client session
       if (token.id) session.user.id = token.id as string;
-      if (token.role) session.user.role = token.role as { id: string; name: string; label: string };
-      if (token.permissions) session.user.permissions = token.permissions as string[];
+      if (token.role)
+        session.user.role = token.role as {
+          id: string;
+          name: string;
+          label: string;
+        };
+      if (token.permissions)
+        session.user.permissions = token.permissions as string[];
       return session;
     },
   },
@@ -95,7 +139,6 @@ const authConfig: NextAuthConfig = {
     error: "/login",
   },
 
-  // Prevent stack traces from leaking to client
   logger: {
     error(error) {
       console.error("[NextAuth Error]", error);
